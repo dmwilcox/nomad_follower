@@ -15,6 +15,8 @@ var DEFAULT_CIRCUIT_BREAK = 60 * time.Second
 var DEFAULT_LOG_FILE = "nomad.log"
 var DEFAULT_SAVE_FILE = "nomad-follower.json"
 
+var DEFAULT_LOG_TAG = "nomad_follower"
+
 var MAX_LOG_SIZE = 50
 var MAX_LOG_BACKUPS = 1
 var MAX_LOG_AGE = 1
@@ -45,6 +47,11 @@ func main() {
 		saveFile = DEFAULT_SAVE_FILE
 	}
 
+	logTag := os.Getenv("LOG_TAG")
+	if logTag == "" {
+		logTag = DEFAULT_LOG_TAG
+	}
+
 	createLogFile(logFile, logger)
 	fileLogger := log.New(&lumberjack.Logger{
 		Filename:   logFile,
@@ -70,7 +77,7 @@ func main() {
 		)
 	}
 
-	af, err := NewAllocationFollower(nomadConfig, logger)
+	af, err := NewAllocationFollower(nomadConfig, logger, logTag)
 	if err != nil {
 		logger.Errorf("main", "Error creating Allocation Follower: %s", err)
 		return

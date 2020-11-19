@@ -30,17 +30,19 @@ var BACKOFF_DELAY = 8
 // ouput is preserved under the 'message' field and JSON log output is nested
 // under the 'data' field.
 type NomadLog struct {
-	AllocId string `json:"alloc_id"`
-	JobName string `json:"job_name"`
-	NodeName string `json:"node_name"`
-	ServiceName string `json:"service_name"`
-	ServiceTags []string `json:"service_tags"`
+	AllocId       string            `json:"alloc_id"`
+	JobName       string            `json:"job_name"`
+	JobMeta       map[string]string `json:"job_meta"`
+	NodeName      string            `json:"node_name"`
+	ServiceName   string            `json:"service_name"`
+	ServiceTags   []string          `json:"service_tags"`
 	ServiceTagMap map[string]string `json:"service_tag_map"`
-	TaskName string `json:"task_name"`
+	TaskMeta      map[string]string `json:"task_meta"`
+	TaskName      string            `json:"task_name"`
 	// these all set at log time
-	Timestamp string `json:"timestamp"`
-	Message string `json:"message"`
-	Data map[string]interface{} `json:"data"`
+	Timestamp string                 `json:"timestamp"`
+	Message   string                 `json:"message"`
+	Data      map[string]interface{} `json:"data"`
 }
 
 func (n *NomadLog) ToJSON() (string, error) {
@@ -69,26 +71,26 @@ type FollowedTask struct {
 func NewFollowedTask(alloc *nomadApi.Allocation, taskGroup string, task *nomadApi.Task, nomad NomadConfig, quit chan struct{}, output chan string, logger Logger) *FollowedTask {
 	logTemplate := createLogTemplate(alloc, task)
 	return &FollowedTask{
-		Alloc: alloc,
-		TaskGroup: taskGroup,
-		Task: task,
-		Nomad: nomad,
-		Quit: quit,
-		OutputChan: output,
-		log: logger,
+		Alloc:       alloc,
+		TaskGroup:   taskGroup,
+		Task:        task,
+		Nomad:       nomad,
+		Quit:        quit,
+		OutputChan:  output,
+		log:         logger,
 		logTemplate: logTemplate,
 	}
 }
 
 type StreamState struct {
-	MultiLineBuf []string
+	MultiLineBuf  []string
 	LastTimestamp string
-	ConsecErrors uint
-	FileOffsets map[string]int64
+	ConsecErrors  uint
+	FileOffsets   map[string]int64
 	// internal use only
 	initialBufferCap int
-	quit chan struct{}
-	allocFS *nomadApi.AllocFS
+	quit             chan struct{}
+	allocFS          *nomadApi.AllocFS
 }
 
 func (s *StreamState) BufAdd(msg string) {
@@ -167,7 +169,7 @@ func (ft *FollowedTask) Start(save *SavedTask) {
 	//config.WaitTime = 5 * time.Minute
 	//client, err := nomadApi.NewClient(config)
 	//if err != nil {
-		//ft.ErrorChan <- fmt.Sprintf("{ \"message\":\"%s\"}", err)
+	//ft.ErrorChan <- fmt.Sprintf("{ \"message\":\"%s\"}", err)
 	//}
 	//fs := client.AllocFS()
 
@@ -256,7 +258,6 @@ func (ft *FollowedTask) Start(save *SavedTask) {
 					ft.outState.ConsecErrors += 1
 				}
 
-
 			case errErr := <-stdErrErr:
 				ft.log.Debugf(
 					logContext,
@@ -295,6 +296,7 @@ func createLogTemplate(alloc *nomadApi.Allocation, task *nomadApi.Task) NomadLog
 
 	tmpl.AllocId = alloc.ID
 	tmpl.JobName = *alloc.Job.Name
+	tmpl.JobMeta = alloc.Job.Meta
 	tmpl.NodeName = alloc.NodeName
 	tmpl.ServiceTags = make([]string, 0)
 	tmpl.ServiceTagMap = make(map[string]string)
@@ -304,6 +306,7 @@ func createLogTemplate(alloc *nomadApi.Allocation, task *nomadApi.Task) NomadLog
 		tmpl.ServiceName = service.Name
 		tmpl.ServiceTags = service.Tags
 		tmpl.ServiceTagMap = getServiceTagMap(service)
+		tmpl.TaskMeta = task.Meta
 	} else {
 		for _, tg := range alloc.Job.TaskGroups {
 			if len(tg.Services) == 0 {
@@ -315,6 +318,7 @@ func createLogTemplate(alloc *nomadApi.Allocation, task *nomadApi.Task) NomadLog
 					tmpl.ServiceName = service.Name
 					tmpl.ServiceTags = service.Tags
 					tmpl.ServiceTagMap = getServiceTagMap(service)
+					tmpl.TaskMeta = t.Meta
 				}
 			}
 		}
@@ -324,7 +328,7 @@ func createLogTemplate(alloc *nomadApi.Allocation, task *nomadApi.Task) NomadLog
 	return tmpl
 }
 
-func getServiceTagMap(service nomadApi.Service) (map[string]string) {
+func getServiceTagMap(service nomadApi.Service) map[string]string {
 	var serviceTagMap = make(map[string]string)
 
 	for _, t := range service.Tags {

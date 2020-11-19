@@ -13,18 +13,18 @@ import (
 var SaveFormatVersion = 1
 
 type SavePoint struct {
-	NodeID string `json:"node_id"`
-	SaveFormatVersion int `json:"save_format_version"`
-	SavedAllocs map[string]SavedAlloc `json:"saved_allocs"`
+	NodeID            string                `json:"node_id"`
+	SaveFormatVersion int                   `json:"save_format_version"`
+	SavedAllocs       map[string]SavedAlloc `json:"saved_allocs"`
 }
 
 type SavedAlloc struct {
-	ID string `json:"alloc_id"`
+	ID         string               `json:"alloc_id"`
 	SavedTasks map[string]SavedTask `json:"saved_tasks"`
 }
 
 type SavedTask struct {
-	Key string `json:"key"`
+	Key           string           `json:"key"`
 	StdOutOffsets map[string]int64 `json:"stdout_offsets"`
 	StdErrOffsets map[string]int64 `json:"stderr_offsets"`
 }
@@ -38,16 +38,18 @@ type AllocationFollower struct {
 	Quit        chan bool
 	Ticker      *time.Ticker
 	log         Logger
+	logTag      string
 }
 
 //NewAllocationFollower Creates a new allocation follower
-func NewAllocationFollower(nomad NomadConfig, logger Logger) (a *AllocationFollower, e error) {
+func NewAllocationFollower(nomad NomadConfig, logger Logger, logTag string) (a *AllocationFollower, e error) {
 	return &AllocationFollower{
 		Allocations: make(map[string]*FollowedAllocation),
-		Nomad: nomad,
-		NodeID: "",
-		Quit: make(chan bool),
-		log: logger,
+		Nomad:       nomad,
+		NodeID:      "",
+		Quit:        make(chan bool),
+		log:         logger,
+		logTag:      logTag,
 	}, nil
 }
 
@@ -73,7 +75,7 @@ func (a *AllocationFollower) SetNodeID() error {
 }
 
 //Start registers and de registers allocation followers
-func (a *AllocationFollower) Start(duration time.Duration, savePath string) (<-chan string) {
+func (a *AllocationFollower) Start(duration time.Duration, savePath string) <-chan string {
 	logContext := "AllocationFollower.Start"
 	a.Ticker = time.NewTicker(duration)
 	a.OutChan = make(chan string)
@@ -238,7 +240,7 @@ func (a *AllocationFollower) collectAllocations(save *SavePoint) error {
 		runState := alloc.DesiredStatus == "run" || alloc.ClientStatus == "running"
 		if record == nil && runState {
 			// handle new alloc records w/ potentially saved state
-			falloc := NewFollowedAllocation(alloc, a.Nomad, a.OutChan, a.log)
+			falloc := NewFollowedAllocation(alloc, a.Nomad, a.OutChan, a.log, a.logTag)
 			if save != nil {
 				a.log.Debug("AllocationFollower.collectAllocations", "Restoring saved allocations")
 				savedAlloc := save.SavedAllocs[alloc.ID]

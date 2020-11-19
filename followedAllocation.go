@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	nomadApi "github.com/hashicorp/nomad/api"
 )
 
@@ -13,17 +14,19 @@ type FollowedAllocation struct {
 	Quit       chan struct{}
 	Tasks      []*FollowedTask
 	log        Logger
+	logTag     string
 }
 
 //NewFollowedAllocation creates a new followed allocation
-func NewFollowedAllocation(alloc *nomadApi.Allocation, nomad NomadConfig, outChan chan string, logger Logger) *FollowedAllocation {
+func NewFollowedAllocation(alloc *nomadApi.Allocation, nomad NomadConfig, outChan chan string, logger Logger, logTag string) *FollowedAllocation {
 	return &FollowedAllocation{
-		Alloc: alloc,
-		Nomad: nomad,
+		Alloc:      alloc,
+		Nomad:      nomad,
 		OutputChan: outChan,
-		Quit: make(chan struct{}),
-		Tasks: make([]*FollowedTask, 0),
-		log: logger,
+		Quit:       make(chan struct{}),
+		Tasks:      make([]*FollowedTask, 0),
+		log:        logger,
+		logTag:     logTag,
 	}
 }
 
@@ -38,15 +41,23 @@ func (f *FollowedAllocation) Start(save *SavedAlloc) {
 	for _, tg := range f.Alloc.Job.TaskGroups {
 		for _, task := range tg.Tasks {
 			ft := NewFollowedTask(f.Alloc, *tg.Name, task, f.Nomad, f.Quit, f.OutputChan, f.log)
-			if save != nil {
-				f.log.Debug("FollowedAllocation.Start", "Restoring saved allocation data")
-				key := fmt.Sprintf("%s:%s", *tg.Name, task.Name)
-				savedTask := save.SavedTasks[key]
-				ft.Start(&savedTask)
-			} else {
-				ft.Start(nil)
+			skip := true
+			for _, s := range ft.logTemplate.ServiceTags {
+				if s == f.logTag {
+					skip = false
+				}
 			}
-			f.Tasks = append(f.Tasks, ft)
+			if !skip {
+				if save != nil {
+					f.log.Debug("FollowedAllocation.Start", "Restoring saved allocation data")
+					key := fmt.Sprintf("%s:%s", *tg.Name, task.Name)
+					savedTask := save.SavedTasks[key]
+					ft.Start(&savedTask)
+				} else {
+					ft.Start(nil)
+				}
+				f.Tasks = append(f.Tasks, ft)
+			}
 		}
 	}
 }

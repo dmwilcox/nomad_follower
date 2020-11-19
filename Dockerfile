@@ -1,13 +1,7 @@
-FROM golang:1.10.0-alpine3.7
+FROM golang:1.14-alpine AS builder
+ADD . /build
+RUN cd /build && go install -mod=mod
 
-RUN apk add --update --no-cache git
-
-ADD . /go/src/github.com/adragoset/nomad_follower
-
-RUN set -ex \
-    && go get github.com/kardianos/govendor \
-    && cd /go/src/github.com/adragoset/nomad_follower \
-    && govendor sync \
-    && go install
-
-CMD nomad_follower
+FROM alpine:latest
+COPY --from=builder /go/bin/nomad_follower .
+CMD ["./nomad_follower"]
